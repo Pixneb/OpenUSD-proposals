@@ -1256,8 +1256,9 @@ class TsSeriesInterface
     bool IsC2Continuous() const;
 
     // Insert a knot at the specified time, exactly preserving the shape of the
-    // curve.  If there is already a knot at that time, do nothing.
-    void Split(double time);
+    // curve.  If there is already a knot at that time, do nothing.  Return
+    // whether a new knot was added.
+    bool Split(double time);
 
     void RemoveKnot(double time);
 
@@ -1407,8 +1408,10 @@ class TsSlopedInterface
 
     // All subclasses implement:
     // bool EvalDerivative(double time, T *valueOut) const;
+    // bool EvalPreDerivative(double time, T *valueOut) const;
 
     bool EvalDerivative(double time, VtValue *valueOut) const;
+    bool EvalPreDerivative(double time, VtValue *valueOut) const;
 };
 
 class TsSpline :
