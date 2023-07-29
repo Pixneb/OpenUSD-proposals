@@ -419,6 +419,11 @@ In **Hermite** segments, the value is determined by the Hermite curve defined by
 the tangent slopes.  Hermite segments are exactly equivalent to Bezier segments
 with tangent lengths that are one-third of the interval width.
 
+![Held knots](./held.png)
+![Linear knots](./linear.png)
+![Bezier knots](./bezier.png)
+![Hermite knots](./hermite.png)
+
 ## Tangents
 
 Tangents in USD splines can be specified in either of two forms:
@@ -431,46 +436,42 @@ conversion can lose numeric precision due to rounding error from multiplication
 and division.  We want to allow clients to round-trip tangents through USD Anim
 and get back exactly what they put in.
 
+### Tangent Components
+
+![Tangent components](./tangents.png)
+
+Tangent vectors are decomposed into _length_, in the time dimension, and
+_height_, in the value dimension.
+
+Lengths are always positive.  They are absolute offsets from the knots to which
+they belong.  Their time scale is the same as the enclosing layer's time scale,
+the same scale used by the knot times.
+
 ### Presto Tangents
 
 Presto tangents are specified by _slope_ and _length_.
 
-Slopes are "rise over run".  The "rise" units are in the value dimension, and
-the "run" units are in the time dimension.  The units of slopes are the same as
-the units of values; a slope specifies the value change per unit of time.  So,
-for example, in a spline of doubles, the slopes are also doubles.  A positive
-slope (regardless of whether it is a pre-slope or a post-slope) increases in
-value as time increases, a negative slope decreases in value as time increases,
-and a zero slope is _flat_: it does not change in value over time.  Slopes may
-approach vertical, but they may never be infinite, so they cannot quite be
-vertical, and they cannot invert past vertical.  This means that slopes never
-cause a spline to become a non-function where the curve has multiple values at
-any time.
-
-Lengths specify the time dimension only: the projection of the tangent vector
-onto the time axis.  Lengths are always positive.
-
-The time scale for both slopes and lengths is the enclosing layer's time scale,
-the same scale used by the knot times.  Slopes and lengths are specified using
-absolute time deltas.
+Slopes are "rise over run": height divided by length.  The types of slopes are
+the same as the types of values; a slope specifies the value change per unit of
+time.  A positive slope (regardless of whether it is a pre-slope or a
+post-slope) increases in value as time increases, a negative slope decreases in
+value as time increases, and a zero slope is _flat_: it does not change in value
+over time.  Slopes may approach vertical, but they may never be infinite, so
+they cannot quite be vertical, and they cannot invert past vertical.  This means
+that slopes never cause a spline to become a non-function where the curve has
+multiple values at any time.
 
 ### Maya Tangents
 
-Maya tangents are specified by _height_ and _length_.  These two values are the
-lengths of the two short sides of a right triangle whose hypotenuse is the
-tangent vector.
+Maya tangents are specified by _height_ and _length_.
 
 The units of height are the same as the units of values.
-
-The time scale for lengths is the enclosing layer's time scale, the same scale
-used by the knot times.  Heights and lengths are specified using absolute deltas
-from knot coordinates.
 
 Height and length are both specified multiplied by 3; e.g. if a tangent vector
 is 1.5 units in the time dimension, its length is recorded as 4.5.
 
-Lengths are always positive.  Heights are positive for upward-sloping
-post-tangents, and negative for upward-sloping pre-tangents.
+Heights are positive for upward-sloping post-tangents, and negative for
+upward-sloping pre-tangents.
 
 ### Continuity
 
@@ -486,6 +487,11 @@ queried from a spline.  These are the cases:
 | C0               | Yes              | No               | No                   | Broken tangents (mismatched slopes)   |
 | C1               | Yes              | Yes              | No                   | Unequal tangents (mismatched lengths) |
 | C2               | Yes              | Yes              | Yes                  | Identical tangents                    |
+
+![Discontinuous](./discontinuous.png)
+![C0](./C0.png)
+![C1](./C1.png)
+![C2](./C2.png)
 
 ### Automatic Tangents
 
@@ -504,7 +510,9 @@ behavior_.
 
 The exact algorithm for computing automatic tangents has yet to be specified;
 most likely we will adopt one of the Maya auto-tangent algorithms.  Other
-algorithms are possible, and may be available in the future.
+algorithms are possible, and may be available in the future.  Ideally any
+automatic tangent algorithm will support both Bezier and Hermite segments, but
+in theory some algorithms could be applicable only to Beziers.
 
 Automatic tangents are arguably in tension with our stated goal of not having
 any magical tuning parameters in USD Anim.  Nevertheless:
@@ -532,6 +540,8 @@ predictable: create a cusp where the Bezier curve overlaps itself.
 It is also theoretically possible to forbid tangents that cause crossovers.  But
 this would likely be surprising, and would violate our "All Splines Valid"
 principle (detailed below).
+
+![Crossovers](./crossovers.png)
 
 ## Dual-Valued Knots
 
@@ -584,6 +594,9 @@ forms:
    after the knots.  Extrapolating loops support modes called _Repeat_, _Reset_,
    and _Oscillate_, described below.
 
+![Inner loops](./innerLoops.png)
+![Extrapolating loops](./extrapLoops.png)
+
 It will be possible to use both systems in the same series.  In that case, inner
 loops are resolved first, and then extrapolating loops take into account the
 entire series, from first to last knot, with the inner-loop repeats included.
@@ -614,6 +627,10 @@ region.  The echoed knot at a join between iterations has a pre-tangent
 determined by the end of the prototype region, and a post-tangent determined by
 the start of the prototype region.  These modes generally do not preserve
 continuity; the cases are explained below.
+
+![Repeat](./repeat.png)
+![Reset](./reset.png)
+![Oscillate](./oscillate.png)
 
 Continue and Repeat modes both use a _value offset_ at each loop iteration.
 This ensures C0 continuity at the joins between iterations.  If the value at the
@@ -662,6 +679,8 @@ Here are the categories of knots as they relate to looping.  Note that each
 query returns knots without any indication of which of these categories they
 belong to.  Clients can classify knots if they need to, by examining the looping
 control parameters.
+
+![Loop regions](./loopRegions.png)
 
 | Knot category             | Included in "authored knots" query? | Included in "baked knots" query? |
 | :------------------------ | :---------------------------------: | :------------------------------: |
