@@ -918,6 +918,26 @@ output spline.
 The `usdview` application will be updated to display series values, including a
 basic visualization of curves over time.
 
+## Motion Blur
+
+When rendering animated USD content with motion blur, we must determine the time
+coordinates at which samples should be taken.  This can include both how many
+different samples should be taken for a given frame, and how the samples are
+distributed in time.
+
+In existing USD content, animated values are represented with time samples.
+Time samples provide clear policy about render sampling: we sample at the time
+sample times.
+
+When rendering USD content containing splines, the situation will be different.
+We could potentially use knot times for sampling, but knot times don't
+necessarily indicate an intent to sample; they may only have been chosen in
+order to achieve a desired curve shape with sparse data.
+
+We have not yet determined what mechanisms we will implement for motion-blur
+sampling of splines, but we are aware that changes and testing will be required.
+It is possible that render hints, recorded via schemas, will play a role.
+
 ## Deferred Features
 
 When there are series opinions on multiple layers, only the series from the
