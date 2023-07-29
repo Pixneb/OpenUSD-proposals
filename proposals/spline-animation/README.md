@@ -183,6 +183,11 @@ Here is a summary of the proposed data fields that will make up splines and
 related classes.  This is an abstract description, not a literal data structure.
 However, the USD Anim API will follow this description at least partly.
 
+We are proposing a generalization of splines that we call _series_.  A series is
+a set of values over time for any value type.  _Splines_ are the most important
+subtype of series, specifically for floating-point scalars.  Details are given
+below.
+
 ```
 //
 // Common interface.
@@ -481,17 +486,29 @@ part of spline data, and is not automatically preserved by USD editing
 operations, but it may be ensured programmatically by clients, and it may be
 queried from a spline.  These are the cases:
 
-| Continuity class | Continuous value | Continuous slope | Continuous curvature | How achieved                          |
-| :--------------- | :--------------: | :--------------: | :------------------: | :------------------------------------ |
-| Discontinuous    | No               | No               | No                   | Dual-valued knot                      |
-| C0               | Yes              | No               | No                   | Broken tangents (mismatched slopes)   |
-| C1               | Yes              | Yes              | No                   | Unequal tangents (mismatched lengths) |
-| C2               | Yes              | Yes              | Yes                  | Identical tangents                    |
+| Continuity class | Continuous value | Continuous tangents | Continuous slope | How achieved                          |
+| :--------------- | :--------------: | :-----------------: | :--------------: | :------------------------------------ |
+| Discontinuous    | No               | No                  | No               | Dual-valued knot                      |
+| C0               | Yes              | No                  | No               | Broken tangents (mismatched slopes)   |
+| G1               | Yes              | Yes                 | No               | Unequal tangents (mismatched lengths) |
+| C1               | Yes              | Yes                 | Yes              | Identical tangents                    |
 
 ![Discontinuous](./discontinuous.png)
 ![C0](./C0.png)
+![G1](./G1.png)
 ![C1](./C1.png)
-![C2](./C2.png)
+
+The higher continuities G2 and C2 are sometimes useful, but for now we are
+proposing omitting them from the queries supported by USD splines.  That is for
+two reasons:
+
+- For G2 and C2, there aren't intuitive rules about how tangents align.
+  Instead, more abstract geometric invariants must be maintained.
+
+- Achieving G2 and C2 requires relinquishing some degree of "local control",
+  which is typically a vital benefit of Bezier splines.  Local control means
+  that a knot or tangent position may be changed without affecting the curve on
+  any segments other than its own.
 
 ### Automatic Tangents
 
@@ -535,11 +552,12 @@ arbitrary time.  Maya shortens tangents until the loop disappears, resulting in
 a smooth shape, but one that is very different than what is authored.
 
 We may wish to choose one of these algorithms, but a third would be more
-predictable: create a cusp where the Bezier curve overlaps itself.
+predictable: create a cusp (a sharp point) where the Bezier curve overlaps
+itself.
 
 It is also theoretically possible to forbid tangents that cause crossovers.  But
 this would likely be surprising, and would violate our "All Splines Valid"
-principle (detailed below).
+principle (described below under "Error Handling").
 
 ![Crossovers](./crossovers.png)
 
@@ -640,7 +658,7 @@ iterations _accumulate_: each iteration is offset in value from its neighbors.
 In Repeat mode, the joins between iterations can be continuous, but only to the
 extent that the post-tangent of the first knot is continuous with the
 pre-tangent of the last knot.  Otherwise, the joins in Repeat mode have
-C1-discontinuous cusps.
+G1-discontinuous cusps.
 
 Reset mode is like Repeat, except that it exactly reproduces the values from the
 prototype region in each iteration.  If the value at the end of the prototype
@@ -650,7 +668,7 @@ discontinuities (instantaneous changes) at the iteration boundaries.
 Oscillate mode is like Repeat, except that the shape of the curve is
 time-reversed in every other iteration.  The iterations do not accumulate,
 because the time-reversed iterations return the curve to its starting value.  In
-Oscillate mode, the joins between iterations are C1-continuous only if the
+Oscillate mode, the joins between iterations are G1-continuous only if the
 tangents are flat, since the tangents across joins are mirrored.
 
 ### Knots Shadowed by Inner Loops
@@ -736,7 +754,7 @@ interpolation methods:
 - **Linear**: spherical linear interpolation, or "slerp" for short.  Linearly
   interpolates a great circle on a sphere.
 
-- **Eased**: the 5-dimensional spline is a smooth (C1) curve with automatically
+- **Eased**: the 5-dimensional spline is a smooth (G1) curve with automatically
   determined tangents.  This is similar to the scalar-spline case of Bezier
   curves with automatic tangents.  The resulting motion is not a great circle;
   direction and speed change smoothly, with no discontinuities at the knots.
@@ -844,7 +862,7 @@ believe the higher complexity of series merits the different treatment.
 We are also proposing that the time-sample-oriented methods of `UsdAttribute`
 continue to address only time samples, and not series.
 
-## Spline Composition
+## Series Composition
 
 The `pcp` library will need to be equipped to compose series.  The scope of this
 task is still TBD, but at a minimum, series will need to be retimed when
@@ -1163,8 +1181,10 @@ non-templated, for simplicity, and to avoid the need for non-templated base
 classes.  We propose that typed access to values and slopes be accomplished by
 means of templated accessors and mutators, and that type-erased access be
 available by passing `VtValue` as an in or out parameter, instead of the value
-type.  We propose that typed access be the moral equivalent of
-`VtValue::UncheckedGet`, with no guardrails for incorrect types.
+type.  We propose that typed read access be the moral equivalent of
+`VtValue::UncheckedGet`, with no guardrails for incorrect types.  Typed write
+access, on the other hand, will verify that all knots in a sequence use the same
+type.
 
 ## Error Handling
 
@@ -1291,8 +1311,8 @@ class TsSeriesInterface
     // Conveniences that return whether all knots pass the tests of the same
     // names.
     bool IsC0Continuous() const;
+    bool IsG1Continuous() const;
     bool IsC1Continuous() const;
-    bool IsC2Continuous() const;
 
     // Insert a knot at the specified time, exactly preserving the shape of the
     // curve.  If there is already a knot at that time, do nothing.  Return
@@ -1344,8 +1364,8 @@ protected:
     // This is an implementation detail; these are possible examples.
     virtual TfType _GetValueType() const = 0;
     virtual bool _IsC0Continuous() const = 0;
+    virtual bool _IsG1Continuous() const = 0;
     virtual bool _IsC1Continuous() const = 0;
-    virtual bool _IsC2Continuous() const = 0;
     virtual void _Split(double time) = 0;
     virtual void _RemoveKnot(double time) = 0;
     virtual void _SetPreExtrap(TsExtrapMethod method) = 0;
@@ -1548,8 +1568,8 @@ class TsKnotInterface
     TsInterpMethod GetPostInterp() const;
 
     bool IsC0Continuous() const;
+    bool IsG1Continuous() const;
     bool IsC1Continuous() const;
-    bool IsC2Continuous() const;
 
     void SetCustomData(const VtDictionary &customData);
     VtDictionary GetCustomData() const;
@@ -1561,8 +1581,8 @@ protected:
     // This is an implementation detail; these are possible examples.
     virtual bool _SetPostInterp(TsInterpMethod method) = 0;
     virtual bool _IsC0Continuous() const = 0;
+    virtual bool _IsG1Continuous() const = 0;
     virtual bool _IsC1Continuous() const = 0;
-    virtual bool _IsC2Continuous() const = 0;
 };
 
 class TsSplineKnot :
