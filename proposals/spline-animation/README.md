@@ -177,6 +177,14 @@ In USD Anim, when we talk about Hermites, we are talking about the first
 version: the restricted class of curves with fixed-length tangents.  This is
 also what is meant by "Hermite" in Maya.
 
+## Resources
+
+[Freya Holmer's spline video](https://www.youtube.com/watch?v=jvPPXbo87ds) is a
+wonderful introduction to splines.
+
+[The Pomax Bezier page](https://pomax.github.io/bezierinfo/) is the definitive
+resource for spline math in programming.
+
 # OBJECT MODEL
 
 Here is a summary of the proposed data fields that will make up splines and
